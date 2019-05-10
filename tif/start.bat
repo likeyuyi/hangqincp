@@ -1,0 +1,1 @@
+tesseract ba.font.exp0.tif ba.font.exp0 batch.nochop makebox
