@@ -1,15 +1,15 @@
 ECHO 处于打开状态。
 echo Run Tesseract for Training..
-tesseract.exe ba.font.exp0.tif ba.font.exp0 nobatch box.train
+tesseract.exe bh.font.exp0.tif bh.font.exp0 nobatch box.train
 echo Compute the Character Set..
-unicharset_extractor.exe ba.font.exp0.box
-mftraining -F font_properties -U unicharset -O ba.unicharset ba.font.exp0.tr
+unicharset_extractor.exe bh.font.exp0.box
+mftraining -F font_properties -U unicharset -O bh.unicharset bh.font.exp0.tr
 echo Clustering..
-cntraining.exe ba.font.exp0.tr
+cntraining.exe bh.font.exp0.tr
 echo Rename Files..
-rename normproto ba.normproto
-rename inttemp ba.inttemp
-rename pffmtable ba.pffmtable
-rename shapetable ba.shapetable
+rename normproto bh.normproto
+rename inttemp bh.inttemp
+rename pffmtable bh.pffmtable
+rename shapetable bh.shapetable
 echo Create Tessdata.. 
-combine_tessdata.exe ba.
+combine_tessdata.exe bh.

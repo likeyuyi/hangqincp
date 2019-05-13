@@ -142,25 +142,37 @@ def identify(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom, numb
             region = img1.crop(item)
 
             if m == 0:
-                code.append(pytesseract.image_to_string(region, config='-psm 7 sfz', lang='new'))
+                code.append(pytesseract.image_to_string(region, config='-psm 7 sfz', lang='chi_sim'))
                 queue1.put(region)
                 m = m + 1
             else:
-                code.append(pytesseract.image_to_string(region, config='-psm 7 sfz', lang='bh'))
+                code.append(pytesseract.image_to_string(region, config='-psm 7 sfz', lang='chi_sim'))
                 queue1.put(region)
                 m = 0
         # code1.append(code)
-        print(code)
+        print(i,code)
 
 
 
 def buttonzhuatu():
     global area, fullleft, fulltop, fullright, fullbuttom, code1
-    queue = Queue()
-    queue1 = Queue()
-    Process(target=grab, args=(queue, fullleft, fulltop, fullright, fullbuttom)).start()
-    Process(target=identify, args=(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom)).start()
+    global queue, queue1, p1, p2
+    queue= Queue()
 
+    queue1= Queue()
+
+    p1=Process(target=grab, args=(queue, fullleft, fulltop, fullright, fullbuttom))
+    p1.start()
+
+    p2=Process(target=identify, args=(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom))
+    p2.start()
+
+def buttonColse():
+    global queue, queue1, p1, p2
+    queue.close()
+    queue1.close()
+    p2.terminate()
+    p1.terminate()
 
 
 
@@ -172,9 +184,9 @@ if __name__ == "__main__":
     fulltop = 99999
     fullright = 0
     fullbuttom = 0
-
     shuju = []
     code1 = []
+    global queue,queue1,p1,p2
     # 创建tkinter主窗口
     root = tkinter.Tk()
     # 指定主窗口位置与大小
@@ -183,12 +195,17 @@ if __name__ == "__main__":
     root.resizable(False, False)
     # 显示选择区域坐标
     lista = tkinter.Listbox(root)
-    lista.place(x=10, y=50, width=160, height=60)
+    lista.place(x=10, y=75, width=160, height=60)
     # 选择对比区域
     buttonCapture = tkinter.Button(root, text='选定区域', command=buttonCaptureClick)
     buttonCapture.place(x=10, y=10, width=160, height=20)
     buttonCapture1 = tkinter.Button(root, text='开始截屏', command=buttonzhuatu)
     buttonCapture1.place(x=10, y=35, width=160, height=20)
+    buttonCapture1 = tkinter.Button(root, text='停止', command=buttonColse)
+    buttonCapture1.place(x=10, y=55, width=160, height=20)
     # 启动消息主循环
 
     root.mainloop()
+
+    p2.terminate()
+    p1.terminate()
