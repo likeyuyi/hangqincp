@@ -1,9 +1,10 @@
 # -*- coding:utf-8 -*-
 
 import os
+import time
 import tkinter
 import tkinter.filedialog
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Manager
 from time import sleep
 
 import mss
@@ -11,8 +12,21 @@ import pytesseract
 import xlwt
 from PIL import Image
 from PIL import ImageGrab
+from pyecharts import options as opts
+from pyecharts.charts import Line
 
+area = []
+fullleft = 99999
+fulltop = 99999
+fullright = 0
+fullbuttom = 0
+shuju = []
 
+code2 = []
+p1 = None
+p2 = None
+queue = None
+queue1 = None
 class MyCapture:
     def __init__(self, png):
         # 变量X和Y用来记录鼠标左键按下的位置
@@ -124,69 +138,104 @@ def grab(queue, fullleft, fulltop, fullright, fullbuttom, Interval=0.2, numbers=
         for i in range(numbers):
             queue.put(sct.grab(monitor))
             sleep(Interval)
+    queue.put(None)
 
 
-def identify(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom, numbers=1000):
+def identify(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom, code1):
+
     shuju = []
-
+    i = 0
+    j = 0
+    # 计算截图后的有效数据区域
     for item in area:
         shuju.append((item[0] - fullleft, item[2] - fulltop, item[1] - fullleft, item[3] - fulltop))
-    for i in range(numbers):
+    
+    while "there are screenshots":
+
         img = queue.get()
+        if img is None:
+            break
         img1 = Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
         m = 0
         code = []
-
+        code.append(i)
         for item in shuju:
-
             region = img1.crop(item)
-
             if m == 0:
-                code.append(pytesseract.image_to_string(region, config='-psm 7 sfz', lang='chi_sim'))
-                queue1.put(region)
+                code.append(pytesseract.image_to_string(region, config='-psm 7 sfz', lang='new'))
                 m = m + 1
             else:
-                code.append(pytesseract.image_to_string(region, config='-psm 7 sfz', lang='chi_sim'))
-                queue1.put(region)
+                code.append(pytesseract.image_to_string(region, config='-psm 7 sfz', lang='new'))
                 m = 0
-        # code1.append(code)
-        print(i,code)
+        if code[1] != j or code[1] != code[2]:
+            code1.append(code)
+            queue1.put(img1)
+            j = code[1]
+        print(code1)
+        i = i + 1
+    queue1.put(None)
 
 
-
+def saveData(queue1, outpanth):
+    while "there are screenshots":
+        ct = time.time()
+        local_time = time.localtime(ct)
+        data_secs = int((ct - int(ct)) * 1000)
+        filepath = outpanth + str(local_time.tm_hour) + str(local_time.tm_min) + str(local_time.tm_sec) + str(
+            data_secs) + ".png"
+        img = queue1.get()
+        img.save(filepath)
+        if img is None:
+            break
 def buttonzhuatu():
     global area, fullleft, fulltop, fullright, fullbuttom, code1
-    global queue, queue1, p1, p2
+    global queue, queue1, p1, p2, p3
+    local_time = time.localtime(time.time())
+    outpath = r"./" + str(local_time.tm_hour) + str(local_time.tm_min) + r"/"
+    os.mkdir(outpath)
     queue= Queue()
-
     queue1= Queue()
-
     p1=Process(target=grab, args=(queue, fullleft, fulltop, fullright, fullbuttom))
     p1.start()
-
-    p2=Process(target=identify, args=(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom))
+    p2 = Process(target=identify, args=(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom, code1))
     p2.start()
+    p3 = Process(target=saveData, args=(queue1, outpath))
+    p3.start()
+
 
 def buttonColse():
-    global queue, queue1, p1, p2
+    global queue, queue1, p1, p2, p3
+    B1 = []
+    A1 = []
+    A2 = []
+    for item in code1:
+        B1.append(item[0])
+        A1.append(item[1])
+        A2.append(item[2])
+        # A3.append(item[3])
+
+    line = Line(init_opts=opts.InitOpts(width="1600px", height="800px"))
+    line.set_global_opts(xaxis_opts=opts.AxisOpts(is_scale=True),
+                         yaxis_opts=opts.AxisOpts(is_scale=True),
+                         title_opts=opts.TitleOpts(title="行情快慢的比较"),
+                         datazoom_opts=[opts.DataZoomOpts(is_show=True)],
+                         toolbox_opts=opts.ToolboxOpts(is_show=True))
+
+    line.add_xaxis(B1)
+    line.add_yaxis("先选", A1)
+    line.add_yaxis("后选", A2)
+    # line.add_yaxis("公司软件",A3)
+    line.render()
+    data_write("data.xls", code1)
     queue.close()
     queue1.close()
     p2.terminate()
     p1.terminate()
-
-
-
-
+    p3.terminate()
 
 if __name__ == "__main__":
-    area = []
-    fullleft = 99999
-    fulltop = 99999
-    fullright = 0
-    fullbuttom = 0
-    shuju = []
-    code1 = []
-    global queue,queue1,p1,p2
+    manaa = Manager()
+    code1 = manaa.list([])
     # 创建tkinter主窗口
     root = tkinter.Tk()
     # 指定主窗口位置与大小
@@ -201,11 +250,11 @@ if __name__ == "__main__":
     buttonCapture.place(x=10, y=10, width=160, height=20)
     buttonCapture1 = tkinter.Button(root, text='开始截屏', command=buttonzhuatu)
     buttonCapture1.place(x=10, y=35, width=160, height=20)
-    buttonCapture1 = tkinter.Button(root, text='停止', command=buttonColse)
+    buttonCapture1 = tkinter.Button(root, text='停止并保存数据', command=buttonColse)
     buttonCapture1.place(x=10, y=55, width=160, height=20)
     # 启动消息主循环
-
     root.mainloop()
-
-    p2.terminate()
-    p1.terminate()
+    if p1 != None:
+        p2.terminate()
+        p1.terminate()
+        p3.terminate()
