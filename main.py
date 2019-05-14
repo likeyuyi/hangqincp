@@ -232,6 +232,7 @@ def buttonColse():
     p2.terminate()
     p1.terminate()
     p3.terminate()
+    root.destroy()
 
 if __name__ == "__main__":
     manaa = Manager()
@@ -253,8 +254,6 @@ if __name__ == "__main__":
     buttonCapture1 = tkinter.Button(root, text='停止并保存数据', command=buttonColse)
     buttonCapture1.place(x=10, y=55, width=160, height=20)
     # 启动消息主循环
+    root.protocol("WM_DELETE_WINDOW", buttonColse)
     root.mainloop()
-    if p1 != None:
-        p2.terminate()
-        p1.terminate()
-        p3.terminate()
+
