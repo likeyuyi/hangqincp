@@ -12,7 +12,7 @@ import xlwt
 from PIL import Image
 from PIL import ImageGrab
 from pyecharts import options as opts
-from pyecharts.charts import Line
+from pyecharts.charts import Bar
 
 
 class MyCapture:
@@ -147,6 +147,7 @@ def identify(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom, code
         m = 0
         code = []
         code.append(i)
+        # 识别每个选择区域的数据
         for item in shuju:
             region = img1.crop(item)
             if m == 0:
@@ -159,7 +160,7 @@ def identify(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom, code
             code1.append(code)
             queue1.put(img1)
             j = code[1]
-        print(code1)
+        print(code)
         i = i + 1
     queue1.put(None)
 
@@ -178,48 +179,55 @@ def saveData(queue1, outpanth):
 def buttonzhuatu():
     global area, fullleft, fulltop, fullright, fullbuttom, code1
     global queue, queue1, p1, p2, p3
-    local_time = time.localtime(time.time())
-    outpath = r"./" + str(local_time.tm_hour) + str(local_time.tm_min) + r"/"
-    os.mkdir(outpath)
-    queue= Queue()
-    queue1= Queue()
-    p1=Process(target=grab, args=(queue, fullleft, fulltop, fullright, fullbuttom))
-    p1.start()
-    p2 = Process(target=identify, args=(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom, code1))
-    p2.start()
-    p3 = Process(target=saveData, args=(queue1, outpath))
-    p3.start()
+    if area:
+        local_time = time.localtime(time.time())
+        outpath = r"./" + str(local_time.tm_hour) + str(local_time.tm_min) + r"/"
+        if not os.path.exists(outpath):
+            os.mkdir(outpath)
+        queue = Queue()
+        queue1 = Queue()
+        p1 = Process(target=grab, args=(queue, fullleft, fulltop, fullright, fullbuttom))
+        p1.start()
+        p2 = Process(target=identify, args=(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom, code1))
+        p2.start()
+        p3 = Process(target=saveData, args=(queue1, outpath))
+        p3.start()
+    else:
+        print("至少选定两个有效区域")
 
 
 def buttonColse():
     global queue, queue1, p1, p2, p3
-    B1 = []
-    A1 = []
-    A2 = []
-    for item in code1:
-        B1.append(item[0])
-        A1.append(item[1])
-        A2.append(item[2])
-        # A3.append(item[3])
 
-    line = Line(init_opts=opts.InitOpts(width="1600px", height="800px"))
-    line.set_global_opts(xaxis_opts=opts.AxisOpts(is_scale=True),
-                         yaxis_opts=opts.AxisOpts(is_scale=True),
-                         title_opts=opts.TitleOpts(title="行情快慢的比较"),
-                         datazoom_opts=[opts.DataZoomOpts(is_show=True)],
-                         toolbox_opts=opts.ToolboxOpts(is_show=True))
+    if code1:
+        chartdata = list(map(list, zip(*code1)))
+        print(chartdata)
+        line = Bar(init_opts=opts.InitOpts(width="1600px", height="800px"))
+        line.set_global_opts(xaxis_opts=opts.AxisOpts(is_scale=True),
+                             yaxis_opts=opts.AxisOpts(is_scale=True),
+                             title_opts=opts.TitleOpts(title="行情快慢的比较"),
+                             datazoom_opts=[opts.DataZoomOpts(is_show=True)],
+                             toolbox_opts=opts.ToolboxOpts(is_show=True))
+        line.add_xaxis(chartdata[0])
+    
+        for i in range(len(chartdata) - 1):
+            line.add_yaxis("选择" + str(i), chartdata[i + 1], stack="stack1")
+    
+        line.render()
+        try:
+            data_write("data.xls", code1)
+        except Exception as e:
+            print("EXCEL保存不成功，看文件是否被打开")
+            pass
 
-    line.add_xaxis(B1)
-    line.add_yaxis("先选", A1)
-    line.add_yaxis("后选", A2)
-    # line.add_yaxis("公司软件",A3)
-    line.render()
-    data_write("data.xls", code1)
-    queue.close()
-    queue1.close()
-    p2.terminate()
-    p1.terminate()
-    p3.terminate()
+    try:
+        queue.close()
+        queue1.close()
+        p2.terminate()
+        p1.terminate()
+        p3.terminate()
+    except Exception as e:
+        pass
     root.destroy()
 
 if __name__ == "__main__":
@@ -228,11 +236,7 @@ if __name__ == "__main__":
     fulltop = 99999
     fullright = 0
     fullbuttom = 0
-    code2 = []
-    p1 = None
-    p2 = None
-    queue = None
-    queue1 = None
+
     manaa = Manager()
     code1 = manaa.list([])
     # 创建tkinter主窗口
