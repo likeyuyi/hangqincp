@@ -1,5 +1,4 @@
 # -*- coding:utf-8 -*-
-
 import os
 import time
 import tkinter
@@ -15,18 +14,7 @@ from PIL import ImageGrab
 from pyecharts import options as opts
 from pyecharts.charts import Line
 
-area = []
-fullleft = 99999
-fulltop = 99999
-fullright = 0
-fullbuttom = 0
-shuju = []
 
-code2 = []
-p1 = None
-p2 = None
-queue = None
-queue1 = None
 class MyCapture:
     def __init__(self, png):
         # 变量X和Y用来记录鼠标左键按下的位置
@@ -149,7 +137,7 @@ def identify(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom, code
     # 计算截图后的有效数据区域
     for item in area:
         shuju.append((item[0] - fullleft, item[2] - fulltop, item[1] - fullleft, item[3] - fulltop))
-    
+
     while "there are screenshots":
 
         img = queue.get()
@@ -234,6 +222,16 @@ def buttonColse():
     p3.terminate()
 
 if __name__ == "__main__":
+    area = []
+    fullleft = 99999
+    fulltop = 99999
+    fullright = 0
+    fullbuttom = 0
+    code2 = []
+    p1 = None
+    p2 = None
+    queue = None
+    queue1 = None
     manaa = Manager()
     code1 = manaa.list([])
     # 创建tkinter主窗口
