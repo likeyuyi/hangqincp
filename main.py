@@ -7,12 +7,13 @@ from multiprocessing import Process, Queue, Manager
 from time import sleep
 
 import mss
+import pandas as pd
 import pytesseract
 import xlwt
 from PIL import Image
 from PIL import ImageGrab
 from pyecharts import options as opts
-from pyecharts.charts import Bar
+from pyecharts.charts import Line
 
 
 class MyCapture:
@@ -120,7 +121,7 @@ def buttonCaptureClick():
     os.remove(filename)
 
 
-def grab(queue, fullleft, fulltop, fullright, fullbuttom, Interval=0.2, numbers=1000, ):
+def grab(queue, fullleft, fulltop, fullright, fullbuttom, Interval=0.2, numbers=10, ):
     monitor = {"top": fulltop, "left": fullleft, "width": fullright - fullleft, "height": fullbuttom - fulltop}
     with mss.mss() as sct:
         for i in range(numbers):
@@ -133,12 +134,12 @@ def identify(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom, code
 
     shuju = []
     i = 0
-    j = 0
+
     # 计算截图后的有效数据区域
     for item in area:
         shuju.append((item[0] - fullleft, item[2] - fulltop, item[1] - fullleft, item[3] - fulltop))
 
-    while "there are screenshots":
+    while "there are identify":
 
         img = queue.get()
         if img is None:
@@ -156,10 +157,13 @@ def identify(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom, code
             else:
                 code.append(pytesseract.image_to_string(region, config='-psm 7 sfz', lang='new'))
                 m = 0
-        if code[1] != j or code[1] != code[2]:
-            code1.append(code)
-            queue1.put(img1)
-            j = code[1]
+        # 判断有不相等的对比组存图
+        for x, y in zip(code[1::2], code[2::2]):
+    
+            if x != y:
+                queue1.put(img1)
+
+        code1.append(code)
         print(code)
         i = i + 1
     queue1.put(None)
@@ -167,15 +171,18 @@ def identify(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom, code
 
 def saveData(queue1, outpanth):
     while "there are screenshots":
+        img = queue1.get()
+        if img is None:
+            break
+        
         ct = time.time()
         local_time = time.localtime(ct)
         data_secs = int((ct - int(ct)) * 1000)
         filepath = outpanth + str(local_time.tm_hour) + str(local_time.tm_min) + str(local_time.tm_sec) + str(
             data_secs) + ".png"
-        img = queue1.get()
         img.save(filepath)
-        if img is None:
-            break
+
+
 def buttonzhuatu():
     global area, fullleft, fulltop, fullright, fullbuttom, code1
     global queue, queue1, p1, p2, p3
@@ -196,24 +203,46 @@ def buttonzhuatu():
         print("至少选定两个有效区域")
 
 
+def chartCreat(code3):
+    j = 0
+    print(code3)
+    dfObj = pd.DataFrame(list(code3))
+    
+    while "huantu":
+        try:
+            ddf = dfObj.iloc[:, [0, j + 1, j + 2]].drop_duplicates([j + 1, j + 2])
+            templist = ddf.values.tolist()
+            
+            chartdata = list(map(list, zip(*templist)))
+            line = Line(init_opts=opts.InitOpts(width="1600px", height="800px"))
+            line.set_global_opts(xaxis_opts=opts.AxisOpts(is_scale=True),
+                                 yaxis_opts=opts.AxisOpts(is_scale=True),
+                                 title_opts=opts.TitleOpts(title="行情快慢的比较"),
+                                 datazoom_opts=[opts.DataZoomOpts(is_show=True)],
+                                 toolbox_opts=opts.ToolboxOpts(is_show=True))
+            line.add_xaxis(chartdata[0])
+            line.add_yaxis("选择" + str(j + 1), chartdata[1], stack="stack1")
+            line.add_yaxis("选择" + str(j + 2), chartdata[2], stack="stack1")
+            line.render(str(j) + ".html")
+            print(chartdata)
+            print(len(code3[0]))
+            j += 2
+            if j >= len(code3[0]) - 1:
+                print(len(code3[0]))
+                break
+        except Exception as e:
+            
+            pass
+        
+        
+    
+
+
 def buttonColse():
     global queue, queue1, p1, p2, p3
 
     if code1:
-        chartdata = list(map(list, zip(*code1)))
-        print(chartdata)
-        line = Bar(init_opts=opts.InitOpts(width="1600px", height="800px"))
-        line.set_global_opts(xaxis_opts=opts.AxisOpts(is_scale=True),
-                             yaxis_opts=opts.AxisOpts(is_scale=True),
-                             title_opts=opts.TitleOpts(title="行情快慢的比较"),
-                             datazoom_opts=[opts.DataZoomOpts(is_show=True)],
-                             toolbox_opts=opts.ToolboxOpts(is_show=True))
-        line.add_xaxis(chartdata[0])
-    
-        for i in range(len(chartdata) - 1):
-            line.add_yaxis("选择" + str(i), chartdata[i + 1], stack="stack1")
-    
-        line.render()
+        chartCreat(code1)
         try:
             data_write("data.xls", code1)
         except Exception as e:
