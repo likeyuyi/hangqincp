@@ -203,10 +203,10 @@ def buttonzhuatu():
         print("至少选定两个有效区域")
 
 
-def chartCreat(code3):
+def chartCreat(code1):
     j = 0
-    print(code3)
-    dfObj = pd.DataFrame(list(code3))
+    print(code1)
+    dfObj = pd.DataFrame(list(code1))
     
     while "huantu":
         try:
@@ -225,10 +225,10 @@ def chartCreat(code3):
             line.add_yaxis("选择" + str(j + 2), chartdata[2], stack="stack1")
             line.render(str(j) + ".html")
             print(chartdata)
-            print(len(code3[0]))
+            print(len(code1[0]))
             j += 2
-            if j >= len(code3[0]) - 1:
-                print(len(code3[0]))
+            if j >= len(code1[0]) - 1:
+	            print(len(code1[0]))
                 break
         except Exception as e:
             
