@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-import concurrent.futures
+
 import os
 import time
 import tkinter
@@ -26,9 +26,9 @@ class MyImg:
         ct = time.time()
         local_time = time.localtime(ct)
         data_secs = int((ct - int(ct)) * 1000)
-        self.timestamp = str(local_time.tm_hour) + str(local_time.tm_min) + "_" + str(local_time.tm_sec) + "_" + str(
-            data_secs)
-            
+        self.timestamp = str(local_time.tm_hour) + str(local_time.tm_min) + \
+                         "_" + str(local_time.tm_sec) + "_" + str(data_secs)
+
 
 class MyCapture:
     def __init__(self, png):
@@ -42,13 +42,21 @@ class MyCapture:
         screenHeight = root.winfo_screenheight()
         # print(screenHeight)
         # 创建顶级组件容器
-        self.top = tkinter.Toplevel(root, width=screenWidth, height=screenHeight)
+        self.top = tkinter.Toplevel(
+            root, width=screenWidth, height=screenHeight)
         # 不显示最大化、最小化按钮
         self.top.overrideredirect(True)
-        self.canvas = tkinter.Canvas(self.top, bg='white', width=screenWidth, height=screenHeight)
+        self.canvas = tkinter.Canvas(
+            self.top,
+            bg='white',
+            width=screenWidth,
+            height=screenHeight)
         # 显示全屏截图，在全屏截图上进行区域截图
         self.image = tkinter.PhotoImage(file=png)
-        self.canvas.create_image(screenWidth // 2, screenHeight // 2, image=self.image)
+        self.canvas.create_image(
+            screenWidth // 2,
+            screenHeight // 2,
+            image=self.image)
 
         # 鼠标左键按下的位置
         def onLeftButtonDown(event):
@@ -69,7 +77,8 @@ class MyCapture:
                 self.canvas.delete(lastDraw)
             except Exception as e:
                 pass
-            lastDraw = self.canvas.create_rectangle(self.X.get(), self.Y.get(), event.x, event.y, outline='red')
+            lastDraw = self.canvas.create_rectangle(
+                self.X.get(), self.Y.get(), event.x, event.y, outline='red')
 
         self.canvas.bind('<B1-Motion>', onLeftButtonMove)
 
@@ -91,9 +100,17 @@ class MyCapture:
         self.canvas.pack(fill=tkinter.BOTH, expand=tkinter.YES)
 
 
-def tess(shuju, img1):
-    region = img1.crop(shuju)
-    return (pytesseract.image_to_string(region, config='-psm 7 sfz', lang='new'))
+# tesseract 识别
+
+
+def tess(item, img1):
+    region = img1.crop(item)
+    return (
+        pytesseract.image_to_string(
+            region,
+            config='-psm 7 sfz',
+            lang='new'))
+
 
 #  将数据写入新EXCEL文件
 def data_write(file_path, datas):
@@ -139,8 +156,25 @@ def buttonCaptureClick():
     os.remove(filename)
 
 
-def grab(queue, fullleft, fulltop, fullright, fullbuttom, Interval=0.2, numbers=100000, ):
-    monitor = {"top": fulltop, "left": fullleft, "width": fullright - fullleft, "height": fullbuttom - fulltop}
+# 截屏
+
+
+def grab(
+        queue,
+        fullleft,
+        fulltop,
+        fullright,
+        fullbuttom,
+        Interval=0.2,
+        numbers=100000,
+):
+    monitor = {
+        "top": fulltop,
+        "left": fullleft,
+        "width": fullright -
+                 fullleft,
+        "height": fullbuttom -
+                  fulltop}
 
     for i in range(numbers):
         m = MyImg(monitor)
@@ -153,49 +187,30 @@ def grab(queue, fullleft, fulltop, fullright, fullbuttom, Interval=0.2, numbers=
 
 
 def identify(queue1, area, fullleft, fulltop, code1):
-
     shuju = []
-    tempcode =[]
+    tempcode = []
     i = 0
-
     # 计算截图后的有效数据区域
     for item in area:
-        shuju.append((item[0] - fullleft, item[2] - fulltop, item[1] - fullleft, item[3] - fulltop))
-
+        shuju.append(
+            (item[0] - fullleft,
+             item[2] - fulltop,
+             item[1] - fullleft,
+             item[3] - fulltop))
     while "there are identify":
-    
         tempimg = queue1.get()
-    
         if tempimg is None:
             break
         with Image.open(tempimg) as img1:
-            m = 0
-            code = []
-            code.append(i)
-            dd = list(map(list, zip(*enumerate(shuju))))
             # 识别每个选择区域的数据
-            with concurrent.futures.ProcessPoolExecutor() as executor:
-                ff = {executor.submit(tess, item, img1): item for item in dd[1]}
-                for future in concurrent.futures.as_completed(ff):
-                    print(future.result())
-        
-            for item in shuju:
-                region = img1.crop(item)
-                if m == 0:
-                    code.append(pytesseract.image_to_string(region, config='-psm 7 sfz', lang='new'))
-                    m = m + 1
-                else:
-                    code.append(pytesseract.image_to_string(region, config='-psm 7 sfz', lang='new'))
-                    m = 0
-        # 判断有不相等的对比组存图
-        #for x, y in zip(code[1::2], code[2::2]):
-    
+            code = [i] + [tess(item, img1) for item in shuju]
+        # 判断重复的删图
         if tempcode[1::] == code[1::]:
             img1.close()
             os.remove(tempimg)
         tempcode = code
         code1.append(code)
-        print(code)
+        print('%s还有%d未识别' % (code, queue1.qsize()))
         i = i + 1
 
 
@@ -213,16 +228,31 @@ def saveData(queue, queue1, outpanth):
 def buttonzhuatu():
     global area, fullleft, fulltop, fullright, fullbuttom, code1
     global queue, queue1, p1, p2, p3
-    if len(area) >=2:
+    if len(area) >= 2 and len(area) % 2 == 0:
         local_time = time.localtime(time.time())
-        outpath = r"./" + str(local_time.tm_hour) + str(local_time.tm_min) + r"/"
+        outpath = r"./" + str(local_time.tm_hour) + \
+                  str(local_time.tm_min) + r"/"
         if not os.path.exists(outpath):
             os.mkdir(outpath)
         queue = Queue()
         queue1 = Queue()
-        p1 = Process(target=grab, args=(queue, fullleft, fulltop, fullright, fullbuttom))
+        p1 = Process(
+            target=grab,
+            args=(
+                queue,
+                fullleft,
+                fulltop,
+                fullright,
+                fullbuttom))
 
-        p2 = Process(target=identify, args=(queue1, area, fullleft, fulltop, code1))
+        p2 = Process(
+            target=identify,
+            args=(
+                queue1,
+                area,
+                fullleft,
+                fulltop,
+                code1))
 
         p3 = Process(target=saveData, args=(queue, queue1, outpath))
         p1.start()
@@ -232,6 +262,9 @@ def buttonzhuatu():
         print("至少选定两个有效区域")
 
 
+# 数据可视化
+
+
 def chartCreat(code1):
     j = 0
     print(code1)
@@ -239,16 +272,23 @@ def chartCreat(code1):
 
     while "chart":
         try:
-            ddf = dfObj.iloc[:, [0, j + 1, j + 2]].drop_duplicates([j + 1, j + 2])
+            ddf = dfObj.iloc[:, [0, j + 1, j + 2]
+                  ].drop_duplicates([j + 1, j + 2])
             templist = ddf.values.tolist()
-            
+
             chartdata = list(map(list, zip(*templist)))
-            line = Line(init_opts=opts.InitOpts(width="1600px", height="800px"))
-            line.set_global_opts(xaxis_opts=opts.AxisOpts(is_scale=True),
-                                 yaxis_opts=opts.AxisOpts(is_scale=True),
-                                 title_opts=opts.TitleOpts(title="行情快慢的比较"),
-                                 datazoom_opts=[opts.DataZoomOpts(is_show=True)],
-                                 toolbox_opts=opts.ToolboxOpts(is_show=True))
+            line = Line(
+                init_opts=opts.InitOpts(
+                    width="1600px",
+                    height="800px"))
+            line.set_global_opts(
+                xaxis_opts=opts.AxisOpts(
+                    is_scale=True), yaxis_opts=opts.AxisOpts(
+                    is_scale=True), title_opts=opts.TitleOpts(
+                    title="行情快慢的比较"), datazoom_opts=[
+                    opts.DataZoomOpts(
+                        is_show=True)], toolbox_opts=opts.ToolboxOpts(
+                    is_show=True))
             line.add_xaxis(chartdata[0])
             line.add_yaxis("选择" + str(j + 1), chartdata[1])
             line.add_yaxis("选择" + str(j + 2), chartdata[2])
@@ -258,16 +298,27 @@ def chartCreat(code1):
             if j >= len(code1[0]) - 1:
                 break
         except Exception as e:
-            
+            print('发生%s错误' % e)
             pass
-        
-        
-    
 
 
 def buttonColse():
     global queue, queue1, p1, p2, p3
 
+    try:
+        while True:
+            if queue1.qsize() < 1:
+            
+                queue1.put(None)
+                p2.terminate()
+                p1.terminate()
+                p3.terminate()
+                break
+            else:
+                queue.put(None)
+                sleep(1)
+    except Exception as e:
+        pass
     if code1:
         chartCreat(code1)
         try:
@@ -276,15 +327,8 @@ def buttonColse():
             print("EXCEL保存不成功，看文件是否被打开")
             pass
 
-    try:
-        queue.close()
-        queue1.close()
-        p2.terminate()
-        p1.terminate()
-        p3.terminate()
-    except Exception as e:
-        pass
     root.destroy()
+
 
 if __name__ == "__main__":
     area = []
@@ -304,7 +348,8 @@ if __name__ == "__main__":
     lista = tkinter.Listbox(root)
     lista.place(x=10, y=75, width=160, height=60)
     # 选择对比区域
-    buttonCapture = tkinter.Button(root, text='选定区域', command=buttonCaptureClick)
+    buttonCapture = tkinter.Button(
+        root, text='选定区域', command=buttonCaptureClick)
     buttonCapture.place(x=10, y=10, width=160, height=20)
     buttonCapture1 = tkinter.Button(root, text='开始截屏', command=buttonzhuatu)
     buttonCapture1.place(x=10, y=35, width=160, height=20)
@@ -313,4 +358,3 @@ if __name__ == "__main__":
     # 启动消息主循环
     root.protocol("WM_DELETE_WINDOW", buttonColse)
     root.mainloop()
-
