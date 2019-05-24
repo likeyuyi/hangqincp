@@ -1,4 +1,5 @@
 # -*- coding:utf-8 -*-
+import concurrent.futures
 import os
 import time
 import tkinter
@@ -7,6 +8,7 @@ from multiprocessing import Process, Queue, Manager
 from time import sleep
 
 import mss
+import mss.tools
 import pandas as pd
 import pytesseract
 import xlwt
@@ -15,6 +17,18 @@ from PIL import ImageGrab
 from pyecharts import options as opts
 from pyecharts.charts import Line
 
+
+class MyImg:
+    def __init__(self, monitor):
+        # 因存储和识别都有延时，截图时同时记录时间
+        with mss.mss() as sct:
+            self.myimg = sct.grab(monitor)
+        ct = time.time()
+        local_time = time.localtime(ct)
+        data_secs = int((ct - int(ct)) * 1000)
+        self.timestamp = str(local_time.tm_hour) + str(local_time.tm_min) + "_" + str(local_time.tm_sec) + "_" + str(
+            data_secs)
+            
 
 class MyCapture:
     def __init__(self, png):
@@ -77,6 +91,10 @@ class MyCapture:
         self.canvas.pack(fill=tkinter.BOTH, expand=tkinter.YES)
 
 
+def tess(shuju, img1):
+    region = img1.crop(shuju)
+    return (pytesseract.image_to_string(region, config='-psm 7 sfz', lang='new'))
+
 #  将数据写入新EXCEL文件
 def data_write(file_path, datas):
     f = xlwt.Workbook()
@@ -121,18 +139,23 @@ def buttonCaptureClick():
     os.remove(filename)
 
 
-def grab(queue, fullleft, fulltop, fullright, fullbuttom, Interval=0.2, numbers=10, ):
+def grab(queue, fullleft, fulltop, fullright, fullbuttom, Interval=0.2, numbers=100000, ):
     monitor = {"top": fulltop, "left": fullleft, "width": fullright - fullleft, "height": fullbuttom - fulltop}
-    with mss.mss() as sct:
-        for i in range(numbers):
-            queue.put(sct.grab(monitor))
-            sleep(Interval)
+
+    for i in range(numbers):
+        m = MyImg(monitor)
+        queue.put(m)
+        sleep(Interval)
+        # if time.localtime(time.time()).tm_hour >= 15:
+        #   print("过了三点停了")
+        #  break
     queue.put(None)
 
 
-def identify(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom, code1):
+def identify(queue1, area, fullleft, fulltop, code1):
 
     shuju = []
+    tempcode =[]
     i = 0
 
     # 计算截图后的有效数据区域
@@ -140,53 +163,57 @@ def identify(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom, code
         shuju.append((item[0] - fullleft, item[2] - fulltop, item[1] - fullleft, item[3] - fulltop))
 
     while "there are identify":
-
-        img = queue.get()
-        if img is None:
-            break
-        img1 = Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
-        m = 0
-        code = []
-        code.append(i)
-        # 识别每个选择区域的数据
-        for item in shuju:
-            region = img1.crop(item)
-            if m == 0:
-                code.append(pytesseract.image_to_string(region, config='-psm 7 sfz', lang='new'))
-                m = m + 1
-            else:
-                code.append(pytesseract.image_to_string(region, config='-psm 7 sfz', lang='new'))
-                m = 0
-        # 判断有不相等的对比组存图
-        for x, y in zip(code[1::2], code[2::2]):
     
-            if x != y:
-                queue1.put(img1)
-
+        tempimg = queue1.get()
+    
+        if tempimg is None:
+            break
+        with Image.open(tempimg) as img1:
+            m = 0
+            code = []
+            code.append(i)
+            dd = list(map(list, zip(*enumerate(shuju))))
+            # 识别每个选择区域的数据
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                ff = {executor.submit(tess, item, img1): item for item in dd[1]}
+                for future in concurrent.futures.as_completed(ff):
+                    print(future.result())
+        
+            for item in shuju:
+                region = img1.crop(item)
+                if m == 0:
+                    code.append(pytesseract.image_to_string(region, config='-psm 7 sfz', lang='new'))
+                    m = m + 1
+                else:
+                    code.append(pytesseract.image_to_string(region, config='-psm 7 sfz', lang='new'))
+                    m = 0
+        # 判断有不相等的对比组存图
+        #for x, y in zip(code[1::2], code[2::2]):
+    
+        if tempcode[1::] == code[1::]:
+            img1.close()
+            os.remove(tempimg)
+        tempcode = code
         code1.append(code)
         print(code)
         i = i + 1
-    queue1.put(None)
 
 
-def saveData(queue1, outpanth):
+def saveData(queue, queue1, outpanth):
     while "there are screenshots":
-        img = queue1.get()
+        img = queue.get()
         if img is None:
             break
-        
-        ct = time.time()
-        local_time = time.localtime(ct)
-        data_secs = int((ct - int(ct)) * 1000)
-        filepath = outpanth + str(local_time.tm_hour) + str(local_time.tm_min) + str(local_time.tm_sec) + str(
-            data_secs) + ".png"
-        img.save(filepath)
+        filepath = outpanth + img.timestamp + ".png"
+        mss.tools.to_png(img.myimg.rgb, img.myimg.size, output=filepath)
+        queue1.put(filepath)
+    queue1.put(None)
 
 
 def buttonzhuatu():
     global area, fullleft, fulltop, fullright, fullbuttom, code1
     global queue, queue1, p1, p2, p3
-    if area:
+    if len(area) >=2:
         local_time = time.localtime(time.time())
         outpath = r"./" + str(local_time.tm_hour) + str(local_time.tm_min) + r"/"
         if not os.path.exists(outpath):
@@ -194,11 +221,13 @@ def buttonzhuatu():
         queue = Queue()
         queue1 = Queue()
         p1 = Process(target=grab, args=(queue, fullleft, fulltop, fullright, fullbuttom))
+
+        p2 = Process(target=identify, args=(queue1, area, fullleft, fulltop, code1))
+
+        p3 = Process(target=saveData, args=(queue, queue1, outpath))
         p1.start()
-        p2 = Process(target=identify, args=(queue, queue1, area, fullleft, fulltop, fullright, fullbuttom, code1))
-        p2.start()
-        p3 = Process(target=saveData, args=(queue1, outpath))
         p3.start()
+        p2.start()
     else:
         print("至少选定两个有效区域")
 
@@ -207,8 +236,8 @@ def chartCreat(code1):
     j = 0
     print(code1)
     dfObj = pd.DataFrame(list(code1))
-    
-    while "huantu":
+
+    while "chart":
         try:
             ddf = dfObj.iloc[:, [0, j + 1, j + 2]].drop_duplicates([j + 1, j + 2])
             templist = ddf.values.tolist()
@@ -221,14 +250,12 @@ def chartCreat(code1):
                                  datazoom_opts=[opts.DataZoomOpts(is_show=True)],
                                  toolbox_opts=opts.ToolboxOpts(is_show=True))
             line.add_xaxis(chartdata[0])
-            line.add_yaxis("选择" + str(j + 1), chartdata[1], stack="stack1")
-            line.add_yaxis("选择" + str(j + 2), chartdata[2], stack="stack1")
+            line.add_yaxis("选择" + str(j + 1), chartdata[1])
+            line.add_yaxis("选择" + str(j + 2), chartdata[2])
             line.render(str(j) + ".html")
-            print(chartdata)
-            print(len(code1[0]))
+
             j += 2
             if j >= len(code1[0]) - 1:
-	            print(len(code1[0]))
                 break
         except Exception as e:
             
@@ -265,7 +292,6 @@ if __name__ == "__main__":
     fulltop = 99999
     fullright = 0
     fullbuttom = 0
-
     manaa = Manager()
     code1 = manaa.list([])
     # 创建tkinter主窗口
