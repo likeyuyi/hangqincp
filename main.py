@@ -4,7 +4,7 @@ import os
 import time
 import tkinter
 import tkinter.filedialog
-from multiprocessing import Process, Queue, Manager
+from multiprocessing import Process, Manager
 from time import sleep
 
 import mss
@@ -202,19 +202,27 @@ def identify(queue1, area, fullleft, fulltop, code1):
         if tempimg is None:
             break
         with Image.open(tempimg) as img1:
-            # 识别每个选择区域的数据,n参数用来决定每个区域不同识别库，所以识别库采用“n.traineddata"命名。
+	        # 识别每个选择区域的数据,n参数用来决定每个区域不同识别库，所以识别库采用'n.traineddata'命名。
             code = [i] + [tess(n, item, img1) for n, item in enumerate(shuju)]
+        if code[1] == code[2]:
+	        print('m%s还有%d未识别' % (code, queue1.qsize()))
+        elif code[1] == tempcode[1]:
+	        print('%s还有%d未识别\033[1;31;44m慢' % (code, queue1.qsize()))
+        elif code[2] == tempcode[2]:
+	        print('%s还有%d未识别\033[1;31;44m快' % (code, queue1.qsize()))
+        else:
+	        print('%s还有%d未识别\033[1;31;44m错' % (code, queue1.qsize()))
+        i = i + 1
         # 判断重复的删图
         if tempcode[1::] == code[1::]:
             img1.close()
-            os.remove(tempimg)
+            try:
+	            os.remove(tempimg)
+            except Exception as e:
+	            pass
+
         tempcode = code
         code1.append(code)
-        if code[1] == code[2]:
-            print('\033[1;33;40m%s还有%d未识别' % (code, queue1.qsize()))
-        else:
-            print('\033[1;31;44m%s还有%d未识别' % (code, queue1.qsize()))
-        i = i + 1
 
 
 def saveData(queue, queue1, outpanth):
@@ -227,17 +235,11 @@ def saveData(queue, queue1, outpanth):
         queue1.put(filepath)
     queue1.put(None)
 
+
 def buttonzhuatu():
     global area, fullleft, fulltop, fullright, fullbuttom, code1
     global queue, queue1, p1, p2, p3
     if len(area) >= 2 and len(area) % 2 == 0:
-        local_time = time.localtime(time.time())
-        outpath = r"./" + str(local_time.tm_hour) + \
-                  str(local_time.tm_min) + r"/"
-        if not os.path.exists(outpath):
-            os.mkdir(outpath)
-        queue = Queue()
-        queue1 = Queue()
         p1 = Process(
             target=grab,
             args=(
@@ -310,8 +312,8 @@ def buttonColse():
     try:
         while True:
             if queue1.qsize() < 1:
-            
-                queue1.put(None)
+	
+	            queue1.put(None)
                 p2.terminate()
                 p1.terminate()
                 p3.terminate()
