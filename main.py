@@ -207,7 +207,7 @@ def identify(queue1, area, fullleft, fulltop, code1):
 			# 识别每个选择区域的数据,n参数用来决定每个区域不同识别库，所以识别库采用'n.traineddata'命名。
 			code = [i] + [tess(n, item, img1) for n, item in enumerate(shuju)]
 		# 判断行情的快慢
-		if code[1] == code[2]:
+		if abs(code[1] - code[2]) > 1:
 			print('%s还有%d未识别' % (code, queue1.qsize()))
 			s = 0
 			e = 0
