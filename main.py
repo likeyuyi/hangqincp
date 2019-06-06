@@ -103,13 +103,13 @@ class MyCapture:
 # tesseract 识别
 
 
-def tess(item, img1):
+def tess(n, item, img1):
     region = img1.crop(item)
     return (
         pytesseract.image_to_string(
             region,
             config='-psm 7 sfz',
-            lang='new'))
+            lang=str(n)))
 
 
 #  将数据写入新EXCEL文件
@@ -202,15 +202,18 @@ def identify(queue1, area, fullleft, fulltop, code1):
         if tempimg is None:
             break
         with Image.open(tempimg) as img1:
-            # 识别每个选择区域的数据
-            code = [i] + [tess(item, img1) for item in shuju]
+            # 识别每个选择区域的数据,n参数用来决定每个区域不同识别库，所以识别库采用“n.traineddata"命名。
+            code = [i] + [tess(n, item, img1) for n, item in enumerate(shuju)]
         # 判断重复的删图
         if tempcode[1::] == code[1::]:
             img1.close()
             os.remove(tempimg)
         tempcode = code
         code1.append(code)
-        print('%s还有%d未识别' % (code, queue1.qsize()))
+        if code[1] == code[2]:
+            print('\033[1;33;40m%s还有%d未识别' % (code, queue1.qsize()))
+        else:
+            print('\033[1;31;44m%s还有%d未识别' % (code, queue1.qsize()))
         i = i + 1
 
 
@@ -223,7 +226,6 @@ def saveData(queue, queue1, outpanth):
         mss.tools.to_png(img.myimg.rgb, img.myimg.size, output=filepath)
         queue1.put(filepath)
     queue1.put(None)
-
 
 def buttonzhuatu():
     global area, fullleft, fulltop, fullright, fullbuttom, code1
